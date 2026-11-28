@@ -53,6 +53,15 @@ class MigrationReadinessDatabaseTests(unittest.TestCase):
         finally:
             cls.admin.close()
 
+    def setUp(self):
+        # Each test starts with a clean disposable schema; avoid order dependence.
+        with self.conn.transaction():
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """TRUNCATE recovery_reviews, operation_requesters,
+                       operation_audit_events, project_write_gates,
+                       sheet_operations CASCADE""")
+
     def test_empty_schema_is_ready_for_review_only(self):
         report = inspect_migration_readiness(self.conn)
         self.assertTrue(report.ready_for_review)
@@ -94,7 +103,6 @@ class MigrationReadinessDatabaseTests(unittest.TestCase):
                             (op, "requester"))
         report = inspect_migration_readiness(self.conn)
         self.assertEqual(report.findings["applying_without_gate"], 0)
-        # This test runs before the deliberately unsafe legacy operation test.
         with self.conn.cursor() as cur:
             cur.execute(
                 """SELECT COUNT(*) FROM sheet_operations o
