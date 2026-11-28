@@ -26,7 +26,7 @@ class AtomicCoordinatorDatabaseTests(unittest.TestCase):
         try:
             with cls.admin.cursor() as cur:
                 cur.execute("CREATE SCHEMA " + cls.schema)
-            cls.conn = psycopg.connect(DSN, options="-c search_path=" + cls.schema)
+            cls.conn = psycopg.connect(DSN, autocommit=True, options="-c search_path=" + cls.schema)
             with cls.conn.transaction():
                 with cls.conn.cursor() as cur:
                     cur.execute(SCHEMA_SQL)
