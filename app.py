@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 from sheets_readonly import verify_schema
 from projects_readonly import get_projects
 from dashboard_readonly import dashboard, activity_history
+from update_preview import preview_update
 
 app = Flask(__name__)
 
@@ -89,6 +90,21 @@ def activities_api():
     except Exception:
         app.logger.exception("Activity History read failed")
         return _api_response({"status": "error", "reason": "Activity History unavailable. Check Render logs."}), 500
+
+@app.post("/api/updates/preview")
+def update_preview_api():
+    if not os.environ.get("PROJECT_API_KEY"):
+        return _api_response({"status": "unavailable"}), 503
+    if not _authorized():
+        return _api_response({"status": "unauthorized"}), 401
+    if not request.is_json or request.content_length is not None and request.content_length > 12000:
+        return _api_response({"status": "invalid_request", "reason": "JSON body required (max 12 KB)"}), 400
+    try:
+        payload, status_code = preview_update(request.get_json(silent=True))
+        return _api_response(payload), status_code
+    except Exception:
+        app.logger.exception("Update preview failed")
+        return _api_response({"status": "error", "reason": "Preview unavailable. Check Render logs."}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
