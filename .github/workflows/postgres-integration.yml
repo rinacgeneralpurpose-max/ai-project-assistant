@@ -52,4 +52,5 @@ jobs:
             test_bypass_guard_integration \
             test_recovery_workflow_integration \
             test_migration_readiness_integration \
-            test_integrity_guards_integration
+            test_integrity_guards_integration \
+            test_operations_readonly_integration
