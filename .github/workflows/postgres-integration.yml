@@ -50,4 +50,6 @@ jobs:
             test_atomic_coordinator_integration \
             test_audited_coordinator_integration \
             test_bypass_guard_integration \
-            test_recovery_workflow_integration
+            test_recovery_workflow_integration \
+            test_migration_readiness_integration \
+            test_integrity_guards_integration
