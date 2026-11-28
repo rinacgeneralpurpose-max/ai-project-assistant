@@ -5,6 +5,7 @@ from sheets_readonly import verify_schema
 from projects_readonly import get_projects
 from dashboard_readonly import dashboard, activity_history
 from update_preview import preview_update
+from approval_readonly import create_review, validate_approval
 
 app = Flask(__name__)
 
@@ -105,6 +106,29 @@ def update_preview_api():
     except Exception:
         app.logger.exception("Update preview failed")
         return _api_response({"status": "error", "reason": "Preview unavailable. Check Render logs."}), 500
+
+
+def _approval_request(handler):
+    if not os.environ.get("PROJECT_API_KEY"):
+        return _api_response({"status": "unavailable"}), 503
+    if not _authorized():
+        return _api_response({"status": "unauthorized"}), 401
+    if not request.is_json or request.content_length is None or request.content_length > 12000:
+        return _api_response({"status": "invalid_request", "reason": "JSON body with Content-Length required (max 12 KB)"}), 400
+    try:
+        payload, code = handler(request.get_json(silent=True))
+        return _api_response(payload), code
+    except Exception:
+        app.logger.exception("Approval validation failed")
+        return _api_response({"status": "error", "reason": "Approval validation unavailable. Check Render logs."}), 500
+
+@app.post("/api/updates/review")
+def review_api():
+    return _approval_request(create_review)
+
+@app.post("/api/updates/validate-approval")
+def validate_approval_api():
+    return _approval_request(validate_approval)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
