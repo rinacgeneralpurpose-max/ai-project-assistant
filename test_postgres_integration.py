@@ -26,7 +26,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         with cls.admin.cursor() as cur:
             cur.execute("CREATE SCHEMA " + cls.schema)
             cur.execute("SET search_path TO " + cls.schema)
-        cls.connection = psycopg.connect(URL, options="-c search_path=" + cls.schema)
+        cls.connection = psycopg.connect(URL, autocommit=True, options="-c search_path=" + cls.schema)
         PostgresApprovalStore(cls.connection).initialize()
 
     @classmethod
