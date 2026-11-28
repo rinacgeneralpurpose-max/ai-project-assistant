@@ -93,9 +93,8 @@ class MigrationReadinessDatabaseTests(unittest.TestCase):
                 cur.execute("INSERT INTO operation_requesters(operation_id,requestor_subject) VALUES (%s,%s)",
                             (op, "requester"))
         report = inspect_migration_readiness(self.conn)
-        self.assertEqual(report.findings["applying_without_gate"], 1)
-        # Earlier tests in the same schema intentionally created an unsafe
-        # legacy applying operation. The audited operation itself is consistent.
+        self.assertEqual(report.findings["applying_without_gate"], 0)
+        # This test runs before the deliberately unsafe legacy operation test.
         with self.conn.cursor() as cur:
             cur.execute(
                 """SELECT COUNT(*) FROM sheet_operations o
