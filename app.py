@@ -6,6 +6,7 @@ from projects_readonly import get_projects
 from dashboard_readonly import dashboard, activity_history
 from update_preview import preview_update
 from approval_readonly import create_review, validate_approval
+from operations_readonly import list_operations, operation_detail
 
 app = Flask(__name__)
 
@@ -129,6 +130,55 @@ def review_api():
 @app.post("/api/updates/validate-approval")
 def validate_approval_api():
     return _approval_request(validate_approval)
+
+
+def _read_only_db_configured():
+    return bool(os.environ.get("READONLY_DATABASE_URL", ""))
+
+
+@app.get("/api/operations")
+def operations_api():
+    if not os.environ.get("PROJECT_API_KEY"):
+        return _api_response({"status": "unavailable"}), 503
+    if not _authorized():
+        return _api_response({"status": "unauthorized"}), 401
+    if not _read_only_db_configured():
+        return _api_response({"status": "unavailable", "reason": "Read-only database not configured"}), 503
+    try:
+        limit = request.args.get("limit", "50")
+        project_id = request.args.get("project_id")
+        result = list_operations(
+            dsn=os.environ["READONLY_DATABASE_URL"],
+            project_id=project_id, limit=limit)
+        return _api_response(result)
+    except ValueError:
+        return _api_response({"status": "invalid_request"}), 400
+    except Exception:
+        app.logger.exception("Read-only operation listing failed")
+        return _api_response({"status": "error", "reason": "Operation status unavailable"}), 500
+
+
+@app.get("/api/operations/<operation_id>")
+def operation_detail_api(operation_id):
+    if not os.environ.get("PROJECT_API_KEY"):
+        return _api_response({"status": "unavailable"}), 503
+    if not _authorized():
+        return _api_response({"status": "unauthorized"}), 401
+    if not _read_only_db_configured():
+        return _api_response({"status": "unavailable", "reason": "Read-only database not configured"}), 503
+    try:
+        result = operation_detail(
+            dsn=os.environ["READONLY_DATABASE_URL"],
+            operation_id=operation_id)
+        if result is None:
+            return _api_response({"status": "not_found"}), 404
+        return _api_response(result)
+    except ValueError:
+        return _api_response({"status": "invalid_request"}), 400
+    except Exception:
+        app.logger.exception("Read-only operation detail failed")
+        return _api_response({"status": "error", "reason": "Operation detail unavailable"}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
