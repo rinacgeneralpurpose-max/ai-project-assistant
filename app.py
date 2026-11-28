@@ -1,41 +1,50 @@
-
 import os
-from flask import Flask, jsonify
+import hmac
+from flask import Flask, jsonify, request
 from sheets_readonly import verify_schema
+from projects_readonly import get_projects
 
 app = Flask(__name__)
 
 @app.get("/health")
 def health():
-    return jsonify(
-        status="ok",
-        service="ai-project-assistant",
-        sheets_connected=False,
-        writes_enabled=False
-    )
+    return jsonify(status="ok", service="ai-project-assistant", writes_enabled=False)
 
 @app.get("/")
 def index():
-    return jsonify(
-        service="ai-project-assistant",
-        mode="read-only-verification",
-        writes_enabled=False
-    )
+    return jsonify(service="ai-project-assistant", mode="read-only-verification", writes_enabled=False)
 
 @app.get("/verify-sheets")
 def verify_sheets():
     try:
-        result = verify_schema()
-        return jsonify(result)
+        return jsonify(verify_schema())
     except Exception:
         app.logger.exception("Google Sheets verification failed")
-        return jsonify(
-            status="error",
-            reason="Verification failed. Check Render logs."
-        ), 500
+        return jsonify(status="error", reason="Verification failed. Check Render logs."), 500
+
+@app.get("/api/projects")
+def projects():
+    secret = os.environ.get("PROJECT_API_KEY", "")
+    supplied = request.headers.get("X-API-Key", "")
+    if not secret:
+        return jsonify(status="unavailable", reason="PROJECT_API_KEY not configured"), 503
+    if not supplied or not hmac.compare_digest(secret, supplied):
+        return jsonify(status="unauthorized"), 401
+    try:
+        limit = int(request.args.get("limit", "50"))
+        offset = int(request.args.get("offset", "0"))
+    except ValueError:
+        return jsonify(status="invalid_request", reason="limit and offset must be integers"), 400
+    if not (1 <= limit <= 100) or offset < 0:
+        return jsonify(status="invalid_request", reason="limit must be 1-100 and offset >= 0"), 400
+    try:
+        result = get_projects(limit=limit, offset=offset)
+        response = jsonify(result)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except Exception:
+        app.logger.exception("Project data read failed")
+        return jsonify(status="error", reason="Unable to read projects. Check Render logs."), 500
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", "10000"))
-    )
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
